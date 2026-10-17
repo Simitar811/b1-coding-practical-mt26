@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from .terrain import generate_reference_and_limits
 import pandas as pd
+from .control import Controller
 
 class Submarine:
     def __init__(self):
@@ -93,16 +94,18 @@ class ClosedLoop:
         if len(disturbances) < T:
             raise ValueError("Disturbances must be at least as long as mission duration")
         
-        positions = np.zeros((T, 2))
-        actions = np.zeros(T)
-        self.plant.reset_state()
+        positions = np.zeros((T, 2)) #positions of the submarine at each time step
+        actions = np.zeros(T) #controller action at each time step
+        self.plant.reset_state() #reset the submarine state
 
         for t in range(T):
             positions[t] = self.plant.get_position()
-            observation_t = self.plant.get_depth()
-            # Call your controller here
-            reference_t = mission.reference[t]
-            actions[t] = self.controller.compute_action(observation_t, reference_t)
+            current_error = mission.reference[t] - positions[t, 1] 
+            if t == 0:
+                previous_error = 0 #e[-1] = 0
+            else:
+                previous_error = mission.reference[t-1] - positions[t-1, 1]
+            actions[t] = self.controller.step(current_error, previous_error) #calculates controller action
             self.plant.transition(actions[t], disturbances[t])
 
         return Trajectory(positions)
